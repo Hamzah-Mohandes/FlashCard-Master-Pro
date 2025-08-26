@@ -1,0 +1,46 @@
+{
+  "name": "flashcart-master-pro",
+  "version": "1.0.0",
+  "description": "Premium Karteikarten-App mit SQLite und Spaced Repetition",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --inspect=5858",
+    "build": "electron-builder",
+    "test": "jest",
+    "lint": "eslint src/ --ext .js",
+    "format": "prettier --write src/**/*.js"
+  },
+  "keywords": [],
+  "author": "Hamzah",
+  "license": "ISC",
+  "dependencies": {
+    "electron": "^37.3.1"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.0.12",
+    "eslint": "^9.34.0",
+    "jest": "^30.0.5",
+    "prettier": "^3.6.2"
+  },
+  "build": {
+    "appId": "com.yourname.flashcard-master-pro",
+    "productName": "FlashCard Master Pro",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "!src/**/*.test.js"
+    ],
+    "mac": {
+      "category": "public.app-category.education"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
