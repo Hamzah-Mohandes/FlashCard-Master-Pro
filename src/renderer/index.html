@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlashCard Master Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 30px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 30px 80px rgba(0,0,0,0.3);
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            min-height: 80vh;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 3rem;
+            background: rgba(255,255,255,0.15);
+            border-radius: 20px;
+            padding: 0.5rem;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 1.2rem 2rem;
+            border: none;
+            border-radius: 15px;
+            background: transparent;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .tab.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .tab:hover:not(.active) {
+            color: white;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .tab-content {
+            display: none;
+            min-height: 400px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* KARTEIKARTE - KORRIGIERT */
+        .card-container {
+            perspective: 1500px;
+            margin: 3rem auto;
+            width: 100%;
+            max-width: 650px;
+            height: 350px;
+        }
+
+        .flashcard {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .flashcard:hover:not(.flipped) {
+            transform: translateY(-10px) rotateY(5deg);
+        }
+
+        .flashcard.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            text-align: center;
+            font-size: 1.4rem;
+            font-weight: 500;
+            line-height: 1.6;
+        }
+
+        .card-front {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            transform: rotateY(180deg);
+        }
+
+        /* CONTROLS */
+        .controls {
+            text-align: center;
+            margin: 3rem 0;
+        }
+
+        .study-controls {
+            display: none;
+        }
+
+        .study-controls.active {
+            display: block;
+        }
+
+        .rating-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 1.2rem 2.5rem;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+
+        .btn-primary { background: linear-gradient(45deg, #667eea, #764ba2); }
+        .btn-secondary { background: linear-gradient(45deg, #6b7280, #4b5563); }
+        .btn-success { background: linear-gradient(45deg, #22c55e, #10b981); }
+        .btn-warning { background: linear-gradient(45deg, #f59e0b, #d97706); }
+        .btn-danger { background: linear-gradient(45deg, #ef4444, #dc2626); }
+
+        /* FORMULAR FÜR NEUE KARTEN */
+        .card-form {
+            background: rgba(255,255,255,0.15);
+            border-radius: 25px;
+            padding: 3rem;
+            margin-bottom: 3rem;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .card-form h3 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+        }
+
+        .form-group {
+            margin-bottom: 2rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.8rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .form-group textarea, .form-group input {
+            width: 100%;
+            padding: 1.5rem;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 15px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 1rem;
+            resize: vertical;
+            transition: all 0.3s ease;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+        }
+
+        .form-group input::placeholder, .form-group textarea::placeholder {
+            color: rgba(255,255,255,0.6);
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* KARTEN LISTE */
+        .cards-section h3 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+        }
+
+        .cards-list {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 1rem;
+        }
+
+        .card-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .card-item:hover {
+            transform: translateX(10px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card-preview-question {
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #a8e6cf;
+            font-size: 1.1rem;
+        }
+
+        .card-preview-answer {
+            margin-bottom: 1.5rem;
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+
+        .card-meta {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            padding-top: 1rem;
+        }
+
+        /* SESSION STATS */
+        .session-stats {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .stat-item {
+            background: rgba(255,255,255,0.15);
+            border-radius: 20px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-8px);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            font-weight: 500;
+        }
+
+        /* PROGRESS */
+        .progress-container {
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #10b981, #06d6a0);
+            border-radius: 10px;
+            transition: width 0.8s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            color: rgba(255,255,255,0.9);
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        /* NOTIFICATION */
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(255,255,255,0.95);
+            color: #333;
+            padding: 1rem 2rem;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            font-weight: 600;
+        }
+
+        .notification.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .notification.success { border-left: 4px solid #22c55e; }
+        .notification.error { border-left: 4px solid #ef4444; }
+        .notification.warning { border-left: 4px solid #f59e0b; }
+
+        @media (max-width: 768px) {
+            .container { margin: 1rem; padding: 1.5rem; }
+            .header h1 { font-size: 2rem; }
+            .card-container { height: 280px; }
+            .rating-controls { flex-direction: column; }
+            .btn { width: 100%; max-width: 300px; }
+            .session-stats { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+    <!-- NOTIFICATION -->
+    <div class="notification" id="notification">
+        <span id="notificationText"></span>
+        <button onclick="hideNotification()" style="background: none; border: none; float: right; cursor: pointer; font-size: 1.2rem;">&times;</button>
+    </div>
+
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>🚀 FlashCard Master Pro</h1>
+            <p>Intelligente Karteikarten für effektives Lernen</p>
+        </div>
+
+        <!-- NAVIGATION TABS -->
+        <div class="tabs">
+            <button class="tab active" data-tab="study">📚 Lernen</button>
+            <button class="tab" data-tab="manage">⚙️ Verwalten</button>
+        </div>
+
+        <!-- LERNEN TAB -->
+        <div id="study" class="tab-content active">
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar"></div>
+                </div>
+                <div class="progress-text" id="progressText">Bereit zum Lernen</div>
+            </div>
+
+            <!-- KARTEIKARTE -->
+            <div class="card-container">
+                <div class="flashcard" id="flashcard">
+                    <!-- VORDERSEITE (FRAGE) -->
+                    <div class="card-face card-front">
+                        <div id="frontContent">
+                            <h2>🎯 Bereit zum Lernen!</h2>
+                            <p>Klicken Sie "Session starten" um zu beginnen</p>
+                        </div>
+                    </div>
+                    
+                    <!-- RÜCKSEITE (ANTWORT) -->
+                    <div class="card-face card-back">
+                        <div id="backContent">
+                            <h2>💡 Antwort</h2>
+                            <p>Die Antwort erscheint hier</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEUERUNG -->
+            <div class="controls">
+                <button class="btn btn-primary" id="startSession">🚀 Session starten</button>
+                
+                <div class="study-controls" id="studyControls">
+                    <button class="btn btn-secondary" id="flipCard">🔄 Karte umdrehen</button>
+                    
+                    <div class="rating-controls">
+                        <button class="btn btn-danger" id="rateHard">🔥 Schwer (1)</button>
+                        <button class="btn btn-warning" id="rateNormal">⭐ Normal (2)</button>
+                        <button class="btn btn-success" id="rateEasy">✅ Einfach (3)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SESSION STATISTIKEN -->
+            <div class="session-stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="sessionCorrect">0</div>
+                    <div class="stat-label">Richtig</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="sessionWrong">0</div>
+                    <div class="stat-label">Falsch</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="sessionAccuracy">0%</div>
+                    <div class="stat-label">Genauigkeit</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VERWALTEN TAB -->
+        <div id="manage" class="tab-content">
+            <!-- FORMULAR FÜR NEUE KARTEN -->
+            <div class="card-form">
+                <h3>✨ Neue Karteikarte erstellen</h3>
+                
+                <div class="form-group">
+                    <label>❓ VORDERSEITE (Frage):</label>
+                    <textarea id="frontInput" placeholder="Geben Sie hier Ihre Frage ein... (z.B. 'Was ist JavaScript?')" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>💡 RÜCKSEITE (Antwort):</label>
+                    <textarea id="backInput" placeholder="Geben Sie hier die Antwort ein... (z.B. 'JavaScript ist eine Programmiersprache...')" rows="4"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>🏷️ Kategorie (optional):</label>
+                    <input id="categoryInput" type="text" placeholder="z.B. Programmierung, Mathematik, Geschichte...">
+                </div>
+                
+                <button class="btn btn-primary" id="addCard">➕ Karteikarte hinzufügen</button>
+            </div>
+
+            <!-- KARTEN-LISTE -->
+            <div class="cards-section">
+                <h3>📚 Ihre Karteikarten-Sammlung</h3>
+                <div id="cardsList" class="cards-list">
+                    <div style="text-align: center; padding: 3rem; opacity: 0.7;">
+                        <p>Ihre Karten werden hier angezeigt...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // FLASHCARD MASTER PRO - KOMPLETTE LOGIK
+        // ==========================================
+
+        console.log('🚀 FlashCard Master Pro startet...');
+
+        // App State
+        let cards = [
+            {
+                id: 1,
+                front: "Was ist React.js?",
+                back: "Eine JavaScript-Bibliothek für Benutzeroberflächen, entwickelt von Meta (Facebook)",
+                category: "Programmierung"
+            },
+            {
+                id: 2,
+                front: "Was ist die Hauptstadt von Deutschland?", 
+                back: "Berlin",
+                category: "Geographie"
+            },
+            {
+                id: 3,
+                front: "Was bedeutet HTML?",
+                back: "HyperText Markup Language - die Auszeichnungssprache für Webseiten",
+                category: "Web Development"
+            }
+        ];
+
+        let currentSession = [];
+        let currentCardIndex = 0;
+        let isFlipped = false;
+        let sessionStats = { correct: 0, wrong: 0, total: 0 };
+
+        // ==========================================
+        // TAB NAVIGATION
+        // ==========================================
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Alle Tabs deaktivieren
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+                
+                // Aktiven Tab aktivieren
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+                
+                // Tab-spezifische Aktionen
+                if (tab.dataset.tab === 'manage') {
+                    renderCardsList();
+                }
+                
+                console.log('📑 Tab gewechselt zu:', tab.dataset.tab);
+            });
+        });
+
+        // ==========================================
+        // LERNSYSTEM
+        // ==========================================
+
+        document.getElementById('startSession').addEventListener('click', startSession);
+        document.getElementById('flipCard').addEventListener('click', flipCard);
+        document.getElementById('flashcard').addEventListener('click', flipCard);
+
+        document.getElementById('rateHard').addEventListener('click', () => rateCard(1));
+        document.getElementById('rateNormal').addEventListener('click', () => rateCard(2));
+        document.getElementById('rateEasy').addEventListener('click', () => rateCard(3));
+
+        function startSession() {
+            console.log('🎓 Starte Lernsession...');
+            
+            if (cards.length === 0) {
+                showNotification('Keine Karten verfügbar! Fügen Sie zuerst Karten hinzu.', 'warning');
+                return;
+            }
+
+            // Session vorbereiten
+            currentSession = [...cards];
+            currentCardIndex = 0;
+            sessionStats = { correct: 0, wrong: 0, total: 0 };
+            
+            // UI umschalten
+            document.getElementById('startSession').style.display = 'none';
+            document.getElementById('studyControls').classList.add('active');
+            
+            // Erste Karte zeigen
+            showCurrentCard();
+            updateSessionStats();
+            
+            showNotification(`Session gestartet! ${currentSession.length} Karten bereit.`, 'success');
+        }
+
+        function showCurrentCard() {
+            if (currentCardIndex >= currentSession.length) {
+                endSession();
+                return;
+            }
+
+            const card = currentSession[currentCardIndex];
+            const flashcard = document.getElementById('flashcard');
+            
+            console.log(`📖 Zeige Karte ${currentCardIndex + 1}/${currentSession.length}`);
+
+            // Karte zurückdrehen
+            flashcard.classList.remove('flipped');
+            isFlipped = false;
+
+            // NUR VORDERSEITE setzen
+            document.getElementById('frontContent').innerHTML = `
+                <div>
+                    <h3 style="margin-bottom: 1.5rem; color: #a8e6cf;">❓ FRAGE</h3>
+                    <p style="font-size: 1.6rem; line-height: 1.4;">${card.front}</p>
+                    <div style="margin-top: 2rem; font-size: 1rem; opacity: 0.8;">
+                        📂 ${card.category}
+                    </div>
+                    <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.6;">
+                        💡 Klicken Sie zum Umdrehen
+                    </div>
+                </div>
+            `;
+
+            // RÜCKSEITE vorbereiten (bleibt versteckt)
+            document.getElementById('backContent').innerHTML = `
+                <div>
+                    <h3 style="margin-bottom: 1.5rem; color: #ffd93d;">💡 ANTWORT</h3>
+                    <p style="font-size: 1.6rem; line-height: 1.4;">${card.back}</p>
+                    <div style="margin-top: 2rem; font-size: 1rem; opacity: 0.8;">
+                        📂 ${card.category}
+                    </div>
+                    <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.6;">
+                        ⭐ Bewerten Sie Ihr Wissen
+                    </div>
+                </div>
+            `;
+
+            updateProgress();
+        }
+
+        function flipCard() {
+            if (currentSession.length === 0) return;
+
+            const flashcard = document.getElementById('flashcard');
+            
+            if (!isFlipped) {
+                // Zur Rückseite (Antwort)
+                flashcard.classList.add('flipped');
+                isFlipped = true;
+                console.log('🔄 → Rückseite (Antwort)');
+            } else {
+                // Zur Vorderseite (Frage)
+                flashcard.classList.remove('flipped');
+                isFlipped = false;
+                console.log('🔄 → Vorderseite (Frage)');
+            }
+        }
+
+        function rateCard(quality) {
+            const card = currentSession[currentCardIndex];
+            console.log(`⭐ Karte "${card.front}" bewertet mit: ${quality}`);
+            
+            // Session Stats
+            sessionStats.total++;
+            if (quality >= 2) {
+                sessionStats.correct++;
+            } else {
+                sessionStats.wrong++;
+            }
+
+            updateSessionStats();
+
+            // Visual Feedback
+            const flashcard = document.getElementById('flashcard');
+            if (quality >= 2) {
+                flashcard.style.boxShadow = '0 0 40px rgba(34, 197, 94, 0.8)';
+                showNotification('Richtig! Gut gemacht! ✅', 'success');
+            } else {
+                flashcard.style.boxShadow = '0 0 40px rgba(239, 68, 68, 0.8)';
+                showNotification('Schwierig! Weiter üben! 💪', 'warning');
+            }
+
+            // Nächste Karte
+            setTimeout(() => {
+                flashcard.style.boxShadow = '';
+                currentCardIndex++;
+                showCurrentCard();
+            }, 1200);
+        }
+
+        function updateProgress() {
+            const progress = currentSession.length > 0 
+                ? ((currentCardIndex + 1) / currentSession.length) * 100 
+                : 0;
+            document.getElementById('progressBar').style.width = progress + '%';
+            document.getElementById('progressText').textContent = 
+                `${currentCardIndex + 1} / ${currentSession.length} Karten`;
+        }
+
+        function updateSessionStats() {
+            document.getElementById('sessionCorrect').textContent = sessionStats.correct;
+            document.getElementById('sessionWrong').textContent = sessionStats.wrong;
+            
+            const accuracy = sessionStats.total > 0 
+                ? Math.round((sessionStats.correct / sessionStats.total) * 100)
+                : 0;
+            document.getElementById('sessionAccuracy').textContent = accuracy + '%';
+        }
+
+        function endSession() {
+            console.log('🎉 Session beendet');
+            
+            const accuracy = sessionStats.total > 0 
+                ? Math.round((sessionStats.correct / sessionStats.total) * 100)
+                : 0;
+
+            // UI zurücksetzen
+            document.getElementById('studyControls').classList.remove('active');
+            document.getElementById('startSession').style.display = 'block';
+
+            // Erfolgsmeldung
+            document.getElementById('frontContent').innerHTML = `
+                <div>
+                    <h2>🎊 Session abgeschlossen!</h2>
+                    <div style="margin: 2rem 0; font-size: 1.4rem;">
+                        📚 <strong>${sessionStats.total}</strong> Karten gelernt<br>
+                        🎯 <strong>${accuracy}%</strong> Genauigkeit<br>
+                        ⭐ <strong>+${sessionStats.total * 10}</strong> XP erhalten
+                    </div>
+                    <p style="font-size: 1.1rem; opacity: 0.9;">
+                        Ausgezeichnet! Starten Sie eine neue Session.
+                    </p>
+                </div>
+            `;
+
+            document.getElementById('progressBar').style.width = '100%';
+            
+            showNotification(`Session beendet! ${accuracy}% Genauigkeit 🎉`, 'success');
+        }
+
+        // ==========================================
+        // KARTEN-MANAGEMENT
+        // ==========================================
+
+        document.getElementById('addCard').addEventListener('click', addNewCard);
+
+        function addNewCard() {
+            const front = document.getElementById('frontInput').value.trim();
+            const back = document.getElementById('backInput').value.trim();
+            const category = document.getElementById('categoryInput').value.trim() || 'Allgemein';
+
+            // Validation
+            if (!front) {
+                showNotification('❓ Bitte geben Sie eine FRAGE ein!', 'warning');
+                document.getElementById('frontInput').focus();
+                return;
+            }
+
+            if (!back) {
+                showNotification('💡 Bitte geben Sie eine ANTWORT ein!', 'warning');
+                document.getElementById('backInput').focus();
+                return;
+            }
+
+            // Neue Karte erstellen
+            const newCard = {
+                id: Date.now(),
+                front: front,
+                back: back,
+                category: category,
+                createdAt: new Date().toLocaleString('de-DE')
+            };
+
+            cards.push(newCard);
+            
+            // Form leeren
+            document.getElementById('frontInput').value = '';
+            document.getElementById('backInput').value = '';
+            document.getElementById('categoryInput').value = '';
+
+            // Liste aktualisieren
+            renderCardsList();
+
+            showNotification('✨ Karteikarte erfolgreich hinzugefügt!', 'success');
+
+            console.log('➕ Neue Karte hinzugefügt:', newCard);
+
+            // Button-Feedback
+            const btn = document.getElementById('addCard');
+            const originalText = btn.textContent;
+            btn.textContent = '✅ Hinzugefügt!';
+            btn.style.background = 'linear-gradient(45deg, #22c55e, #10b981)';
+            
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 2000);
+        }
+
+        function renderCardsList() {
+            const cardsList = document.getElementById('cardsList');
+            
+            if (cards.length === 0) {
+                cardsList.innerHTML = `
+                    <div style="text-align: center; padding: 3rem; opacity: 0.7;">
+                        <h3>📚 Noch keine Karten vorhanden</h3>
+                        <p>Erstellen Sie Ihre erste Karteikarte mit dem Formular oben!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Gruppiere Karten nach Kategorien
+            const grouped = cards.reduce((acc, card) => {
+                const category = card.category || 'Allgemein';
+                if (!acc[category]) acc[category] = [];
+                acc[category].push(card);
+                return acc;
+            }, {});
+
+            let html = '';
+            Object.entries(grouped).forEach(([category, categoryCards]) => {
+                html += `
+                    <div style="margin-bottom: 2.5rem;">
+                        <h4 style="color: #f093fb; margin-bottom: 1.5rem; font-size: 1.3rem; border-bottom: 2px solid rgba(240, 147, 251, 0.3); padding-bottom: 0.5rem;">
+                            📂 ${category} (${categoryCards.length} Karten)
+                        </h4>
+                `;
+                
+                categoryCards.forEach((card, index) => {
+                    html += `
+                        <div class="card-item" style="animation-delay: ${index * 100}ms;">
+                            <div style="flex: 1;">
+                                <div class="card-preview-question">
+                                    ❓ FRAGE: ${card.front}
+                                </div>
+                                <div class="card-preview-answer">
+                                    💡 ANTWORT: ${card.back}
+                                </div>
+                                <div class="card-meta">
+                                    <span>📂 ${card.category}</span>
+                                    <span>📅 ${card.createdAt}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <button class="btn btn-danger" onclick="deleteCard(${card.id})" style="padding: 0.8rem 1.5rem; font-size: 0.9rem;">
+                                    🗑️ Löschen
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            });
+
+            cardsList.innerHTML = html;
+        }
+
+        function deleteCard(cardId) {
+            if (!confirm('🗑️ Sind Sie sicher, dass Sie diese Karte löschen möchten?')) {
+                return;
+            }
+
+            const initialLength = cards.length;
+            const cardToDelete = cards.find(c => c.id === cardId);
+            cards = cards.filter(card => card.id !== cardId);
+            const deletedCount = initialLength - cards.length;
+
+            if (deletedCount > 0) {
+                renderCardsList();
+                showNotification(`Karte "${cardToDelete.front}" erfolgreich gelöscht! 🗑️`, 'success');
+                console.log(`🗑️ Karte gelöscht. Verbleibend: ${cards.length}`);
+            } else {
+                showNotification('Fehler beim Löschen der Karte', 'error');
+            }
+        }
+
+        // ==========================================
+        // NOTIFICATION SYSTEM
+        // ==========================================
+
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            const text = document.getElementById('notificationText');
+
+            text.textContent = message;
+            notification.className = `notification show ${type}`;
+
+            // Auto-hide nach 4 Sekunden
+            setTimeout(() => {
+                hideNotification();
+            }, 4000);
+
+            console.log(`📢 ${type.toUpperCase()}: ${message}`);
+        }
+
+        function hideNotification() {
+            document.getElementById('notification').classList.remove('show');
+        }
+
+        // ==========================================
+        // KEYBOARD SHORTCUTS
+        // ==========================================
+
+        document.addEventListener('keydown', (event) => {
+            // Ignoriere wenn in Input-Feldern getippt wird
+            if (event.target.tagName.toLowerCase() === 'textarea' || 
+                event.target.tagName.toLowerCase() === 'input') {
+                return;
+            }
+
+            switch(event.key.toLowerCase()) {
+                case ' ':
+                case 'enter':
+                    event.preventDefault();
+                    flipCard();
+                    break;
+                case '1':
+                    event.preventDefault();
+                    if (document.getElementById('studyControls').classList.contains('active')) {
+                        rateCard(1);
+                    }
+                    break;
+                case '2':
+                    event.preventDefault();
+                    if (document.getElementById('studyControls').classList.contains('active')) {
+                        rateCard(2);
+                    }
+                    break;
+                case '3':
+                    event.preventDefault();
+                    if (document.getElementById('studyControls').classList.contains('active')) {
+                        rateCard(3);
+                    }
+                    break;
+                case 's':
+                    if (event.ctrlKey || event.metaKey) {
+                        event.preventDefault();
+                        document.getElementById('startSession').click();
+                    }
+                    break;
+                case 'f':
+                    event.preventDefault();
+                    flipCard();
+                    break;
+                case 'm':
+                    event.preventDefault();
+                    document.querySelector('[data-tab="manage"]').click();
+                    break;
+                case 'l':
+                    event.preventDefault();
+                    document.querySelector('[data-tab="study"]').click();
+                    break;
+            }
+        });
+
+        // ==========================================
+        // DEMO & HILFSFUNKTIONEN
+        // ==========================================
+
+        function addDemoCards() {
+            const demoCards = [
+                {
+                    front: "Was ist TypeScript?",
+                    back: "Eine typisierte Superset-Sprache von JavaScript, entwickelt von Microsoft",
+                    category: "Programmierung"
+                },
+                {
+                    front: "Was ist ein Promise in JavaScript?",
+                    back: "Ein Objekt, das den eventuellen Abschluss oder Fehlschlag einer asynchronen Operation repräsentiert",
+                    category: "JavaScript"
+                },
+                {
+                    front: "Was bedeutet DOM?",
+                    back: "Document Object Model - die programmatische Schnittstelle für HTML- und XML-Dokumente",
+                    category: "Web Development"
+                },
+                {
+                    front: "Was ist ein Framework?",
+                    back: "Eine Softwareplattform, die Entwicklern eine Grundstruktur für die Anwendungsentwicklung bietet",
+                    category: "Software Engineering"
+                },
+                {
+                    front: "Was ist REST API?",
+                    back: "Representational State Transfer - ein Architekturstil für die Entwicklung von Web-APIs",
+                    category: "Backend"
+                }
+            ];
+
+            demoCards.forEach(demoCard => {
+                const newCard = {
+                    id: Date.now() + Math.random(),
+                    front: demoCard.front,
+                    back: demoCard.back,
+                    category: demoCard.category,
+                    createdAt: new Date().toLocaleString('de-DE')
+                };
+                cards.push(newCard);
+            });
+
+            renderCardsList();
+            showNotification(`${demoCards.length} Demo-Karten hinzugefügt! 📚`, 'success');
+        }
+
+        // Entwickler-Shortcuts (versteckt)
+        document.addEventListener('keydown', (event) => {
+            if (event.ctrlKey && event.shiftKey) {
+                switch(event.key.toLowerCase()) {
+                    case 'd':
+                        event.preventDefault();
+                        addDemoCards();
+                        console.log('🎮 Demo-Karten hinzugefügt');
+                        break;
+                    case 'c':
+                        event.preventDefault();
+                        cards = [];
+                        renderCardsList();
+                        showNotification('Alle Karten gelöscht! 🧹', 'warning');
+                        console.log('🧹 Alle Karten gelöscht');
+                        break;
+                }
+            }
+        });
+
+        // ==========================================
+        // APP INITIALISIERUNG
+        // ==========================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 FlashCard Master Pro wird initialisiert...');
+            
+            // Karten-Liste initial laden
+            renderCardsList();
+            
+            // Willkommensnachricht
+            setTimeout(() => {
+                showNotification('🎓 FlashCard Master Pro bereit! Viel Erfolg beim Lernen!', 'success');
+            }, 1000);
+            
+            console.log('✅ App vollständig geladen');
+            console.log('📚 Verfügbare Karten:', cards.length);
+            console.log('⌨️ Tastenkürzel:');
+            console.log('   💡 Leertaste/Enter: Karte umdrehen');
+            console.log('   ⭐ 1/2/3: Bewertung vergeben');
+            console.log('   🚀 Ctrl+S: Session starten');
+            console.log('   📑 M: Verwalten-Tab, L: Lernen-Tab');
+            console.log('🎮 Geheime Shortcuts:');
+            console.log('   📚 Ctrl+Shift+D: Demo-Karten hinzufügen');
+            console.log('   🧹 Ctrl+Shift+C: Alle Karten löschen');
+        });
+
+        // Global functions für onclick Events
+        window.deleteCard = deleteCard;
+        window.hideNotification = hideNotification;
+
+        console.log('🎯 FlashCard Master Pro ist bereit zum Lernen!');
+    </script>
+</body>
+</html>

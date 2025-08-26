@@ -1,93 +1,214 @@
-// src/main/index.js - MINIMAL VERSION DIE FUNKTIONIERT
-const { app, BrowserWindow } = require('electron');
+// src/main/index.js - Korrigierte Version
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
 let mainWindow;
+let database;
+
+// JSON-basierte Database (funktioniert immer)
+class FlashCardDatabase {
+    constructor() {
+        this.isConnected = false;
+        this.cards = [
+            {
+                id: 1,
+                front: "Was ist React.js?",
+                back: "Eine JavaScript-Bibliothek für Benutzeroberflächen, entwickelt von Meta",
+                category: "Programmierung"
+            },
+            {
+                id: 2,
+                front: "Was ist JavaScript?",
+                back: "Eine Programmiersprache für Web- und App-Entwicklung",
+                category: "Programmierung"
+            },
+            {
+                id: 3,
+                front: "Was ist Electron?",
+                back: "Framework für Desktop-Apps mit Web-Technologien",
+                category: "Desktop Development"
+            }
+        ];
+    }
+
+    getAllCards() {
+        return [...this.cards];
+    }
+
+    addCard(cardData) {
+        const newCard = {
+            id: Date.now(),
+            front: cardData.front,
+            back: cardData.back,
+            category: cardData.category || 'Allgemein',
+            createdAt: Date.now()
+        };
+
+        this.cards.push(newCard);
+        return newCard;
+    }
+
+    deleteCard(cardId) {
+        const initialLength = this.cards.length;
+        this.cards = this.cards.filter(card => card.id !== parseInt(cardId));
+        return { changes: initialLength - this.cards.length };
+    }
+
+    getCardsForReview(maxCards = 20) {
+        return this.cards.slice(0, maxCards);
+    }
+
+    saveReview(reviewData) {
+        console.log('Review gespeichert:', reviewData);
+        return true;
+    }
+}
 
 function createWindow() {
-    console.log('🪟 Erstelle Fenster...');
+    console.log('Erstelle Hauptfenster...');
 
     mainWindow = new BrowserWindow({
-        width: 1000,
-        height: 700,
+        width: 1200,
+        height: 800,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
-        }
+        },
+        show: false
     });
 
-    // Inline HTML - funktioniert IMMER
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
+    // KOMPLETTES HTML inline (funktioniert garantiert)
+    const htmlContent = `<!DOCTYPE html>
+<html lang="de">
 <head>
-    <title>FlashCard Test</title>
+    <meta charset="UTF-8">
+    <title>FlashCard Master Pro</title>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 30px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
             background-size: 400% 400%;
-            animation: bg 10s ease infinite;
+            animation: gradientShift 15s ease infinite;
             min-height: 100vh;
             color: white;
+            padding: 2rem;
         }
         
-        @keyframes bg {
+        @keyframes gradientShift {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
         
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
-            background: rgba(255,255,255,0.15);
-            border-radius: 25px;
-            padding: 2rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 30px;
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 30px 80px rgba(0,0,0,0.3);
+            padding: 3rem;
+            min-height: 80vh;
         }
         
-        h1 {
+        .header {
             text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .header h1 {
             font-size: 3rem;
+            font-weight: 800;
             margin-bottom: 1rem;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
         
-        .status {
-            background: rgba(34, 197, 94, 0.3);
-            border: 2px solid rgba(34, 197, 94, 0.6);
-            border-radius: 15px;
-            padding: 1rem;
-            text-align: center;
-            margin: 2rem 0;
-            font-size: 1.2rem;
-            font-weight: bold;
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 3rem;
+            background: rgba(255,255,255,0.15);
+            border-radius: 20px;
+            padding: 0.5rem;
         }
         
-        .card {
-            background: rgba(255,255,255,0.2);
-            border-radius: 20px;
-            padding: 3rem;
-            margin: 2rem 0;
-            text-align: center;
-            font-size: 1.5rem;
-            min-height: 200px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+        .tab {
+            flex: 1;
+            padding: 1.2rem 2rem;
+            border: none;
+            border-radius: 15px;
+            background: transparent;
+            color: rgba(255,255,255,0.7);
             cursor: pointer;
             transition: all 0.3s ease;
-            border: 1px solid rgba(255,255,255,0.3);
+            font-weight: 600;
+            font-size: 1.1rem;
         }
         
-        .card:hover {
+        .tab.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        /* KARTEIKARTE */
+        .card-container {
+            perspective: 1500px;
+            margin: 3rem auto;
+            width: 100%;
+            max-width: 700px;
+            height: 400px;
+        }
+        
+        .flashcard {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        
+        .flashcard:hover:not(.flipped) {
             transform: translateY(-10px) rotateY(5deg);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
-            background: rgba(255,255,255,0.25);
+        }
+        
+        .flashcard.flipped {
+            transform: rotateY(180deg);
+        }
+        
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            box-shadow: 0 25px 70px rgba(0,0,0,0.4);
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 500;
+            line-height: 1.6;
+        }
+        
+        .card-front {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .card-back {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            transform: rotateY(180deg);
         }
         
         .btn {
@@ -97,292 +218,360 @@ function createWindow() {
             font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
-            margin: 1rem 0.5rem;
             transition: all 0.3s ease;
             color: white;
+            margin: 0.5rem;
             backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
         }
-        
-        .btn-primary { background: linear-gradient(45deg, #667eea, #764ba2); }
-        .btn-success { background: linear-gradient(45deg, #22c55e, #10b981); }
-        .btn-danger { background: linear-gradient(45deg, #ef4444, #dc2626); }
-        .btn-warning { background: linear-gradient(45deg, #f59e0b, #d97706); }
         
         .btn:hover {
             transform: translateY(-5px);
             box-shadow: 0 15px 35px rgba(0,0,0,0.4);
         }
         
-        .controls {
-            text-align: center;
-            margin: 2rem 0;
+        .btn-primary { background: linear-gradient(45deg, #667eea, #764ba2); }
+        .btn-secondary { background: linear-gradient(45deg, #6b7280, #4b5563); }
+        .btn-success { background: linear-gradient(45deg, #22c55e, #10b981); }
+        .btn-warning { background: linear-gradient(45deg, #f59e0b, #d97706); }
+        .btn-danger { background: linear-gradient(45deg, #ef4444, #dc2626); }
+        
+        .controls { text-align: center; margin: 3rem 0; }
+        .rating-controls { margin-top: 2rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        
+        .card-form {
+            background: rgba(255,255,255,0.15);
+            border-radius: 25px;
+            padding: 3rem;
+            margin-bottom: 3rem;
+            backdrop-filter: blur(15px);
         }
         
-        .form {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 2rem;
-            margin: 2rem 0;
+        .form-group { margin-bottom: 2rem; }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.8rem;
+            font-weight: 600;
+            font-size: 1.2rem;
         }
         
-        .form input, .form textarea {
+        .form-group textarea, .form-group input {
             width: 100%;
-            padding: 1rem;
-            margin: 0.5rem 0;
+            padding: 1.5rem;
             border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 10px;
+            border-radius: 15px;
             background: rgba(255,255,255,0.1);
             color: white;
             font-size: 1rem;
+            resize: vertical;
         }
         
-        .form input::placeholder, .form textarea::placeholder {
-            color: rgba(255,255,255,0.7);
+        .form-group textarea { min-height: 120px; }
+        .form-group input::placeholder, .form-group textarea::placeholder {
+            color: rgba(255,255,255,0.6);
         }
         
-        .debug {
-            background: rgba(0,0,0,0.4);
-            border-radius: 10px;
-            padding: 1rem;
-            margin-top: 2rem;
-            font-family: monospace;
-            font-size: 0.9rem;
-            max-height: 150px;
-            overflow-y: auto;
-            border: 1px solid rgba(255,255,255,0.2);
+        .cards-list { max-height: 400px; overflow-y: auto; }
+        .card-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚀 FlashCard Master Pro</h1>
-        
-        <div class="status" id="status">
-            ✅ Electron läuft erfolgreich!
+        <div class="header">
+            <h1>FlashCard Master Pro</h1>
+            <p>Intelligente Karteikarten für effektives Lernen</p>
         </div>
-        
-        <div class="card" id="flashcard">
-            <div id="cardContent">
-                <h2>🎉 APP FUNKTIONIERT!</h2>
-                <p>Klicken Sie die Buttons unten zum Testen</p>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="study">Lernen</button>
+            <button class="tab" data-tab="manage">Verwalten</button>
+        </div>
+
+        <!-- LERNEN TAB -->
+        <div id="study" class="tab-content active">
+            <div class="card-container">
+                <div class="flashcard" id="flashcard">
+                    <div class="card-face card-front">
+                        <div id="frontContent">
+                            <h2>Bereit zum Lernen!</h2>
+                            <p>Klicken Sie "Session starten"</p>
+                        </div>
+                    </div>
+                    <div class="card-face card-back">
+                        <div id="backContent">
+                            <h2>Antwort</h2>
+                            <p>Hier erscheint die Antwort</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-primary" id="startSession">Session starten</button>
+                
+                <div id="studyControls" style="display: none;">
+                    <button class="btn btn-secondary" id="flipCard">Karte umdrehen</button>
+                    <div class="rating-controls">
+                        <button class="btn btn-danger" id="rateHard">Schwer</button>
+                        <button class="btn btn-warning" id="rateNormal">Normal</button>
+                        <button class="btn btn-success" id="rateEasy">Einfach</button>
+                    </div>
+                </div>
             </div>
         </div>
-        
-        <div class="controls">
-            <button class="btn btn-primary" onclick="testBasic()">🧪 Basis Test</button>
-            <button class="btn btn-success" onclick="flipCard()">🔄 Karte drehen</button>
-            <button class="btn btn-warning" onclick="addTestCard()">➕ Test Karte</button>
-            <button class="btn btn-danger" onclick="clearOutput()">🧽 Leeren</button>
-        </div>
-        
-        <div class="form">
-            <h3>➕ Neue Karte</h3>
-            <input id="questionInput" placeholder="Frage eingeben..." type="text">
-            <textarea id="answerInput" placeholder="Antwort eingeben..." rows="3"></textarea>
-            <button class="btn btn-success" onclick="addCard()">✨ Hinzufügen</button>
-        </div>
-        
-        <div class="debug" id="debugOutput">
-            🔧 Debug-Ausgabe:<br>
+
+        <!-- VERWALTEN TAB -->
+        <div id="manage" class="tab-content">
+            <div class="card-form">
+                <h3>Neue Karteikarte erstellen</h3>
+                
+                <div class="form-group">
+                    <label>FRAGE (Vorderseite):</label>
+                    <textarea id="frontInput" placeholder="Geben Sie Ihre Frage ein..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>ANTWORT (Rückseite):</label>
+                    <textarea id="backInput" placeholder="Geben Sie die Antwort ein..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Kategorie:</label>
+                    <input id="categoryInput" type="text" placeholder="z.B. Programmierung">
+                </div>
+                
+                <button class="btn btn-primary" id="addCard">Karte hinzufügen</button>
+            </div>
+
+            <div class="card-form">
+                <h3>Ihre Karten</h3>
+                <div id="cardsList" class="cards-list">
+                    <p>Karten werden hier angezeigt...</p>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        console.log('🔧 JavaScript lädt...');
+        console.log('App startet...');
         
-        let cards = [];
-        let currentIndex = 0;
+        // OHNE electronAPI - direkte Implementierung
+        let cards = [
+            {
+                id: 1,
+                front: "Was ist React?",
+                back: "JavaScript-Bibliothek für UI",
+                category: "Programmierung"
+            },
+            {
+                id: 2,
+                front: "Was ist 5 + 3?",
+                back: "8",
+                category: "Mathematik"
+            }
+        ];
+        
+        let currentSession = [];
+        let currentCardIndex = 0;
         let isFlipped = false;
         
-        function log(message) {
-            const debug = document.getElementById('debugOutput');
-            const time = new Date().toLocaleTimeString();
-            debug.innerHTML += \`[\${time}] \${message}<br>\`;
-            debug.scrollTop = debug.scrollHeight;
-            console.log('LOG:', message);
-        }
+        // Tab Navigation
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+                
+                if (tab.dataset.tab === 'manage') {
+                    renderCards();
+                }
+            });
+        });
         
-        function testBasic() {
-            log('🧪 Basis-Test gestartet');
+        // Session starten
+        document.getElementById('startSession').addEventListener('click', () => {
+            console.log('Session gestartet');
             
-            // Test 1: DOM Manipulation
-            const card = document.getElementById('flashcard');
-            card.style.background = 'rgba(34, 197, 94, 0.4)';
+            currentSession = [...cards];
+            currentCardIndex = 0;
             
-            setTimeout(() => {
-                card.style.background = 'rgba(255,255,255,0.2)';
-                log('✅ DOM Test erfolgreich');
-            }, 1000);
+            document.getElementById('startSession').style.display = 'none';
+            document.getElementById('studyControls').style.display = 'block';
             
-            // Test 2: JavaScript Funktionalität
-            const testArray = [1, 2, 3, 4, 5];
-            const sum = testArray.reduce((a, b) => a + b, 0);
-            log(\`📊 Array Test: Summe von [1,2,3,4,5] = \${sum}\`);
-            
-            // Test 3: Local Storage
-            try {
-                localStorage.setItem('test', 'funktioniert');
-                const value = localStorage.getItem('test');
-                log(\`💾 LocalStorage Test: \${value}\`);
-            } catch (e) {
-                log('❌ LocalStorage nicht verfügbar');
+            showCurrentCard();
+        });
+        
+        // Karte anzeigen
+        function showCurrentCard() {
+            if (currentCardIndex >= currentSession.length) {
+                alert('Session beendet!');
+                document.getElementById('studyControls').style.display = 'none';
+                document.getElementById('startSession').style.display = 'block';
+                return;
             }
             
-            log('🎉 Alle Basis-Tests abgeschlossen');
+            const card = currentSession[currentCardIndex];
+            
+            // Karte zurückdrehen
+            document.getElementById('flashcard').classList.remove('flipped');
+            isFlipped = false;
+            
+            // NUR Vorderseite setzen
+            document.getElementById('frontContent').innerHTML = 
+                '<h2>FRAGE</h2><p>' + card.front + '</p>';
+            
+            // Rückseite vorbereiten
+            document.getElementById('backContent').innerHTML = 
+                '<h2>ANTWORT</h2><p>' + card.back + '</p>';
         }
         
+        // Karte umdrehen
         function flipCard() {
-            const card = document.getElementById('flashcard');
-            const content = document.getElementById('cardContent');
+            const flashcard = document.getElementById('flashcard');
             
             if (!isFlipped) {
-                card.style.transform = 'rotateY(180deg)';
-                content.innerHTML = \`
-                    <h2>🔄 Rückseite!</h2>
-                    <p>Die Karte wurde gedreht</p>
-                    <small>Klicken Sie nochmal zum Zurückdrehen</small>
-                \`;
+                flashcard.classList.add('flipped');
                 isFlipped = true;
-                log('🔄 Karte umgedreht');
+                console.log('Zur Antwort gedreht');
             } else {
-                card.style.transform = 'rotateY(0deg)';
-                content.innerHTML = \`
-                    <h2>🎉 APP FUNKTIONIERT!</h2>
-                    <p>Klicken Sie die Buttons unten zum Testen</p>
-                \`;
+                flashcard.classList.remove('flipped');
                 isFlipped = false;
-                log('🔄 Karte zurückgedreht');
+                console.log('Zur Frage gedreht');
             }
         }
         
-        function addTestCard() {
-            const testQuestions = [
-                {q: 'Was ist 2+2?', a: '4'},
-                {q: 'Hauptstadt Frankreich?', a: 'Paris'}, 
-                {q: 'Wer erfand JavaScript?', a: 'Brendan Eich'},
-                {q: 'Was bedeutet HTML?', a: 'HyperText Markup Language'},
-                {q: 'Wie viele Tage hat ein Jahr?', a: '365 (366 im Schaltjahr)'}
-            ];
+        document.getElementById('flipCard').addEventListener('click', flipCard);
+        document.getElementById('flashcard').addEventListener('click', flipCard);
+        
+        // Bewertung
+        document.getElementById('rateHard').addEventListener('click', () => rateCard(1));
+        document.getElementById('rateNormal').addEventListener('click', () => rateCard(2));
+        document.getElementById('rateEasy').addEventListener('click', () => rateCard(3));
+        
+        function rateCard(quality) {
+            console.log('Bewertet mit:', quality);
             
-            const randomCard = testQuestions[Math.floor(Math.random() * testQuestions.length)];
-            
-            document.getElementById('questionInput').value = randomCard.q;
-            document.getElementById('answerInput').value = randomCard.a;
-            
-            log(\`🎲 Test-Karte generiert: \${randomCard.q}\`);
+            setTimeout(() => {
+                currentCardIndex++;
+                showCurrentCard();
+            }, 1000);
         }
         
-        function addCard() {
-            const question = document.getElementById('questionInput').value.trim();
-            const answer = document.getElementById('answerInput').value.trim();
+        // Neue Karte hinzufügen
+        document.getElementById('addCard').addEventListener('click', () => {
+            const front = document.getElementById('frontInput').value.trim();
+            const back = document.getElementById('backInput').value.trim();
+            const category = document.getElementById('categoryInput').value.trim() || 'Allgemein';
             
-            if (!question || !answer) {
-                log('⚠️ Validation: Beide Felder müssen ausgefüllt sein');
+            if (!front || !back) {
                 alert('Bitte beide Felder ausfüllen!');
                 return;
             }
             
             const newCard = {
                 id: Date.now(),
-                question: question,
-                answer: answer,
-                created: new Date().toLocaleString('de-DE')
+                front: front,
+                back: back,
+                category: category
             };
             
             cards.push(newCard);
             
             // Form leeren
-            document.getElementById('questionInput').value = '';
-            document.getElementById('answerInput').value = '';
+            document.getElementById('frontInput').value = '';
+            document.getElementById('backInput').value = '';
+            document.getElementById('categoryInput').value = '';
             
-            log(\`✅ Neue Karte hinzugefügt: "\${question}"\`);
-            log(\`📊 Gesamt Karten: \${cards.length}\`);
+            renderCards();
             
-            // Karte anzeigen
-            document.getElementById('cardContent').innerHTML = \`
-                <h3>✨ Neue Karte hinzugefügt!</h3>
-                <p><strong>Frage:</strong> \${question}</p>
-                <p><strong>Antwort:</strong> \${answer}</p>
-                <small>Gesamt: \${cards.length} Karten</small>
-            \`;
-        }
-        
-        function clearOutput() {
-            document.getElementById('debugOutput').innerHTML = '🔧 Debug-Ausgabe:<br>';
-            log('🧽 Debug-Output geleert');
-        }
-        
-        // Beim Laden
-        document.addEventListener('DOMContentLoaded', () => {
-            log('🚀 DOM geladen - App bereit!');
-            log('💻 User Agent: ' + navigator.userAgent);
-            log('🌐 Platform: ' + navigator.platform);
-            
-            // Test ob Electron läuft
-            if (typeof require !== 'undefined') {
-                log('✅ Node.js/Electron Umgebung erkannt');
-                log('📦 Node Version: ' + process.versions.node);
-                log('⚡ Electron Version: ' + process.versions.electron);
-            } else {
-                log('⚠️ Läuft in Browser (nicht Electron)');
-            }
-            
-            document.getElementById('status').innerHTML = '🎉 App komplett geladen und funktionsfähig!';
+            alert('Karte hinzugefügt!');
         });
         
-        // Klick auf Karte
-        document.getElementById('flashcard').addEventListener('click', flipCard);
+        // Karten anzeigen
+        function renderCards() {
+            const cardsList = document.getElementById('cardsList');
+            
+            let html = '';
+            cards.forEach(card => {
+                html += '<div class="card-item">';
+                html += '<div>';
+                html += '<strong>FRAGE:</strong> ' + card.front + '<br>';
+                html += '<strong>ANTWORT:</strong> ' + card.back + '<br>';
+                html += '<small>Kategorie: ' + card.category + '</small>';
+                html += '</div>';
+                html += '<button class="btn btn-danger" onclick="deleteCard(' + card.id + ')">Löschen</button>';
+                html += '</div>';
+            });
+            
+            cardsList.innerHTML = html || '<p>Keine Karten vorhanden</p>';
+        }
+        
+        function deleteCard(cardId) {
+            if (confirm('Karte löschen?')) {
+                cards = cards.filter(card => card.id !== cardId);
+                renderCards();
+            }
+        }
         
         // Keyboard Shortcuts
         document.addEventListener('keydown', (e) => {
+            if (e.target.tagName.toLowerCase() === 'textarea' || 
+                e.target.tagName.toLowerCase() === 'input') return;
+                
             switch(e.key) {
                 case ' ':
+                case 'Enter':
                     e.preventDefault();
                     flipCard();
-                    log('⌨️ Leertaste: Karte gedreht');
                     break;
-                case 't':
-                    testBasic();
-                    log('⌨️ T: Test gestartet');
-                    break;
-                case 'c':
-                    clearOutput();
-                    log('⌨️ C: Output geleert');
-                    break;
+                case '1': rateCard(1); break;
+                case '2': rateCard(2); break;
+                case '3': rateCard(3); break;
             }
         });
+        
+        // Initial load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('App geladen!');
+            renderCards();
+        });
+        
+        // Global functions
+        window.deleteCard = deleteCard;
     </script>
 </body>
 </html>`;
 
-    // Inline HTML laden (funktioniert IMMER)
+    // HTML direkt laden
     mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent));
 
-    // DevTools öffnen
     mainWindow.webContents.openDevTools();
 
     mainWindow.once('ready-to-show', () => {
-        console.log('✅ Fenster ist bereit und wird angezeigt!');
+        console.log('Anwendung bereit!');
         mainWindow.show();
     });
 
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
-
-    // Debug: Zeige was passiert
-    mainWindow.webContents.on('did-finish-load', () => {
-        console.log('🎯 HTML erfolgreich geladen!');
-    });
-
-    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-        console.error('❌ HTML-Load fehlgeschlagen:', errorCode, errorDescription);
-    });
 }
 
-// App Events
+// App starten
 app.whenReady().then(() => {
-    console.log('🚀 Electron ist bereit!');
+    console.log('Electron startet...');
+    database = new FlashCardDatabase();
     createWindow();
 });
 
@@ -397,7 +586,3 @@ app.on('activate', () => {
         createWindow();
     }
 });
-
-console.log('🔧 Main Process Script läuft');
-console.log('📱 Electron Version:', process.versions.electron);
-console.log('📦 Node Version:', process.versions.node);
