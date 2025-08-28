@@ -1,4 +1,4 @@
-// src/renderer/app.js - Frontend Logic
+// src/renderer/app.js - Frontend Logic für sichere Electron API
 
 class FlashCardApp {
     constructor() {
@@ -20,24 +20,24 @@ class FlashCardApp {
     }
 
     async init() {
-        console.log('🚀 FlashCard App wird initialisiert...');
+        console.log('FlashCard App wird initialisiert...');
 
         try {
-            // DOM Elemente laden
+            // DOM Elemente binden
             this.bindElements();
 
             // Event Listeners registrieren
             this.bindEvents();
 
-            // Loading Screen entfernen
+            // Loading Screen verstecken
             await this.hideLoadingScreen();
 
-            // Daten laden
+            // Initiale Daten laden
             await this.loadInitialData();
 
-            console.log('✅ App erfolgreich initialisiert');
+            console.log('App erfolgreich initialisiert');
         } catch (error) {
-            console.error('❌ Fehler beim Initialisieren:', error);
+            console.error('Fehler beim Initialisieren:', error);
             this.showNotification('Fehler beim Starten der App', 'error');
         }
     }
@@ -144,7 +144,10 @@ class FlashCardApp {
         ]);
     }
 
-    // Navigation
+    // =================================
+    // NAVIGATION
+    // =================================
+
     switchTab(tabName) {
         // Tab-Navigation
         this.elements.navTabs.forEach(tab => {
@@ -162,13 +165,16 @@ class FlashCardApp {
             this.loadStats();
         }
 
-        console.log(`📑 Wechsle zu Tab: ${tabName}`);
+        console.log(`Tab gewechselt zu: ${tabName}`);
     }
 
-    // Study Session
+    // =================================
+    // STUDY SESSION
+    // =================================
+
     async startSession() {
         try {
-            console.log('🎓 Starte Lernsession...');
+            console.log('Starte Lernsession...');
 
             // Karten für Review laden
             const response = await window.electronAPI.cards.getForReview(20);
@@ -180,13 +186,13 @@ class FlashCardApp {
             this.currentSession = response.data;
 
             if (this.currentSession.length === 0) {
-                this.showNotification('Keine Karten für Review verfügbar! Fügen Sie neue Karten hinzu oder warten Sie auf das nächste Review.', 'info');
+                this.showNotification('Keine Karten für Review verfügbar! Fügen Sie neue Karten hinzu oder warten Sie auf das nächste Review.', 'warning');
                 return;
             }
 
             // UI umschalten
             this.elements.startSession.style.display = 'none';
-            this.elements.studyControls.style.display = 'block';
+            this.elements.studyControls.classList.add('active');
 
             // Session Stats zurücksetzen
             this.sessionStats = { correct: 0, wrong: 0, total: 0 };
@@ -216,13 +222,31 @@ class FlashCardApp {
         this.isFlipped = false;
 
         // Inhalt setzen
-        this.elements.cardFront.textContent = card.front;
+        this.elements.cardFront.innerHTML = `
+            <div>
+                <h3 style="margin-bottom: 1.5rem; color: #a8e6cf;">Frage</h3>
+                <p style="font-size: 1.6rem; line-height: 1.4;">${this.escapeHtml(card.front)}</p>
+                <div style="margin-top: 2rem; font-size: 1rem; opacity: 0.8;">
+                    ${card.category}
+                </div>
+                <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.6;">
+                    Klicken zum Umdrehen
+                </div>
+            </div>
+        `;
+
         this.elements.cardBack.innerHTML = `
-        ${card.back}
-        <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
-          📂 ${card.category} | 🔄 ${card.review_count} mal gelernt
-        </div>
-      `;
+            <div>
+                <h3 style="margin-bottom: 1.5rem; color: #ffd93d;">Antwort</h3>
+                <p style="font-size: 1.6rem; line-height: 1.4;">${this.escapeHtml(card.back)}</p>
+                <div style="margin-top: 2rem; font-size: 1rem; opacity: 0.8;">
+                    ${card.category} | ${card.reviewCount || 0} mal gelernt
+                </div>
+                <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.6;">
+                    Bewerten Sie Ihr Wissen
+                </div>
+            </div>
+        `;
 
         // Progress aktualisieren
         this.updateProgress();
@@ -247,7 +271,7 @@ class FlashCardApp {
         if (!this.currentSession || this.currentCardIndex >= this.currentSession.length) return;
 
         const card = this.currentSession[this.currentCardIndex];
-        const responseTime = 3000; // Vereinfacht - in echter App würdest du die Zeit messen
+        const responseTime = 3000; // Vereinfacht
 
         try {
             // Review speichern
@@ -271,14 +295,27 @@ class FlashCardApp {
 
             this.updateSessionStats();
 
-            // Nächste Karte oder Session beenden
-            this.currentCardIndex++;
-
-            if (this.currentCardIndex >= this.currentSession.length) {
-                setTimeout(() => this.endSession(), 1000);
+            // Visual Feedback
+            const flashcard = this.elements.flashcard;
+            if (quality >= 2) {
+                flashcard.style.boxShadow = '0 0 40px rgba(34, 197, 94, 0.8)';
+                this.showNotification('Richtig! Gut gemacht!', 'success');
             } else {
-                setTimeout(() => this.showCurrentCard(), 500);
+                flashcard.style.boxShadow = '0 0 40px rgba(239, 68, 68, 0.8)';
+                this.showNotification('Schwierig! Weiter üben!', 'warning');
             }
+
+            // Nächste Karte
+            setTimeout(() => {
+                flashcard.style.boxShadow = '';
+                this.currentCardIndex++;
+
+                if (this.currentCardIndex >= this.currentSession.length) {
+                    setTimeout(() => this.endSession(), 1000);
+                } else {
+                    this.showCurrentCard();
+                }
+            }, 1200);
 
         } catch (error) {
             console.error('Fehler beim Speichern des Reviews:', error);
@@ -297,10 +334,10 @@ class FlashCardApp {
     }
 
     endSession() {
-        console.log('🎉 Session beendet');
+        console.log('Session beendet');
 
         // UI zurücksetzen
-        this.elements.studyControls.style.display = 'none';
+        this.elements.studyControls.classList.remove('active');
         this.elements.startSession.style.display = 'block';
 
         // Session abgeschlossen anzeigen
@@ -309,17 +346,17 @@ class FlashCardApp {
             : 0;
 
         this.elements.cardFront.innerHTML = `
-        <div>
-          <h2>🎊 Session abgeschlossen!</h2>
-          <p style="margin: 1rem 0;">
-            <strong>${this.sessionStats.total}</strong> Karten gelernt<br>
-            <strong>${accuracy}%</strong> Genauigkeit<br>
-            <strong>+${this.sessionStats.total * 10}</strong> XP erhalten
-          </p>
-        </div>
-      `;
+            <div>
+                <h2>Session abgeschlossen!</h2>
+                <p style="margin: 1rem 0;">
+                    <strong>${this.sessionStats.total}</strong> Karten gelernt<br>
+                    <strong>${accuracy}%</strong> Genauigkeit<br>
+                    <strong>+${this.sessionStats.total * 10}</strong> XP erhalten
+                </p>
+            </div>
+        `;
 
-        this.elements.cardBack.textContent = '';
+        this.elements.cardBack.innerHTML = '';
 
         // Progress auf 100%
         this.elements.progressFill.style.width = '100%';
@@ -331,13 +368,16 @@ class FlashCardApp {
         // Stats neu laden
         this.loadStats();
 
-        this.showNotification(`Session beendet! ${accuracy}% Genauigkeit 🎉`, 'success');
+        this.showNotification(`Session beendet! ${accuracy}% Genauigkeit`, 'success');
     }
 
-    // Card Management
+    // =================================
+    // CARD MANAGEMENT
+    // =================================
+
     async loadCards() {
         try {
-            console.log('📚 Lade Karten...');
+            console.log('Lade Karten...');
 
             const response = await window.electronAPI.cards.getAll();
 
@@ -358,11 +398,11 @@ class FlashCardApp {
 
         if (cards.length === 0) {
             cardsList.innerHTML = `
-          <div style="text-align: center; color: rgba(255,255,255,0.6); padding: 3rem;">
-            <h3>📚 Noch keine Karten vorhanden</h3>
-            <p>Erstellen Sie Ihre erste Karte mit dem Formular oben!</p>
-          </div>
-        `;
+                <div style="text-align: center; color: rgba(255,255,255,0.6); padding: 3rem;">
+                    <h3>Noch keine Karten vorhanden</h3>
+                    <p>Erstellen Sie Ihre erste Karte mit dem Formular oben!</p>
+                </div>
+            `;
             return;
         }
 
@@ -372,37 +412,37 @@ class FlashCardApp {
         let html = '';
         Object.entries(cardsByCategory).forEach(([category, categoryCards]) => {
             html += `
-          <div style="margin-bottom: 2rem;">
-            <h4 style="color: #f093fb; margin-bottom: 1rem; font-size: 1.3rem;">
-              📂 ${category} (${categoryCards.length})
-            </h4>
-        `;
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="color: #f093fb; margin-bottom: 1rem; font-size: 1.3rem;">
+                        ${category} (${categoryCards.length})
+                    </h4>
+            `;
 
             categoryCards.forEach((card, index) => {
                 const nextReview = this.calculateNextReview(card);
 
                 html += `
-            <div class="card-item" style="animation-delay: ${index * 100}ms;">
-              <div class="card-item-content">
-                <div style="margin-bottom: 0.8rem;">
-                  <strong>❓ Frage:</strong> ${this.escapeHtml(card.front)}
-                </div>
-                <div style="margin-bottom: 0.8rem;">
-                  <strong>💡 Antwort:</strong> ${this.escapeHtml(card.back)}
-                </div>
-                <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">
-                  🔄 ${card.review_count} mal gelernt | 
-                  📅 Nächste Wiederholung: ${nextReview} |
-                  💪 Schwierigkeit: ${'★'.repeat(Math.min(card.difficulty, 5))}
-                </div>
-              </div>
-              <div class="card-item-actions">
-                <button class="btn btn-danger btn-small" onclick="app.deleteCard(${card.id})">
-                  🗑️ Löschen
-                </button>
-              </div>
-            </div>
-          `;
+                    <div class="card-item" style="animation-delay: ${index * 100}ms;">
+                        <div class="card-item-content">
+                            <div style="margin-bottom: 0.8rem;">
+                                <strong>Frage:</strong> ${this.escapeHtml(card.front)}
+                            </div>
+                            <div style="margin-bottom: 0.8rem;">
+                                <strong>Antwort:</strong> ${this.escapeHtml(card.back)}
+                            </div>
+                            <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">
+                                ${card.reviewCount || 0} mal gelernt | 
+                                Nächste Wiederholung: ${nextReview} |
+                                Schwierigkeit: ${'★'.repeat(Math.min(Math.round(card.difficulty || 1), 5))}
+                            </div>
+                        </div>
+                        <div class="card-item-actions">
+                            <button class="btn btn-danger btn-small" onclick="app.deleteCard(${card.id})">
+                                Löschen
+                            </button>
+                        </div>
+                    </div>
+                `;
             });
 
             html += '</div>';
@@ -423,12 +463,12 @@ class FlashCardApp {
     }
 
     calculateNextReview(card) {
-        if (!card.last_reviewed) {
+        if (!card.lastReviewed) {
             return 'Neu';
         }
 
-        const lastReviewed = new Date(card.last_reviewed);
-        const nextReview = new Date(lastReviewed.getTime() + (card.interval * 24 * 60 * 60 * 1000));
+        const lastReviewed = new Date(card.lastReviewed);
+        const nextReview = new Date(lastReviewed.getTime() + ((card.interval || 1) * 24 * 60 * 60 * 1000));
 
         if (nextReview <= new Date()) {
             return 'Jetzt verfügbar';
@@ -444,7 +484,7 @@ class FlashCardApp {
 
         // Validation
         if (!front || !back) {
-            this.showNotification('Bitte füllen Sie alle Pflichtfelder aus! ⚠️', 'warning');
+            this.showNotification('Bitte füllen Sie alle Pflichtfelder aus!', 'warning');
             return;
         }
 
@@ -459,7 +499,7 @@ class FlashCardApp {
         }
 
         try {
-            console.log('➕ Füge neue Karte hinzu...');
+            console.log('Füge neue Karte hinzu...');
 
             const response = await window.electronAPI.cards.add({
                 front: front,
@@ -482,11 +522,11 @@ class FlashCardApp {
             // Stats aktualisieren
             await this.loadStats();
 
-            this.showNotification('Karte erfolgreich hinzugefügt! ✨', 'success');
+            this.showNotification('Karte erfolgreich hinzugefügt!', 'success');
 
             // Button-Feedback
             const originalText = this.elements.addCard.textContent;
-            this.elements.addCard.textContent = '✅ Hinzugefügt!';
+            this.elements.addCard.textContent = 'Hinzugefügt!';
             this.elements.addCard.style.background = 'linear-gradient(45deg, #22c55e, #10b981)';
 
             setTimeout(() => {
@@ -506,7 +546,7 @@ class FlashCardApp {
         }
 
         try {
-            console.log('🗑️ Lösche Karte:', cardId);
+            console.log('Lösche Karte:', cardId);
 
             const response = await window.electronAPI.cards.delete(cardId);
 
@@ -520,7 +560,7 @@ class FlashCardApp {
             // Stats aktualisieren
             await this.loadStats();
 
-            this.showNotification('Karte erfolgreich gelöscht! 🗑️', 'success');
+            this.showNotification('Karte erfolgreich gelöscht!', 'success');
 
         } catch (error) {
             console.error('Fehler beim Löschen der Karte:', error);
@@ -528,10 +568,13 @@ class FlashCardApp {
         }
     }
 
-    // Statistics
+    // =================================
+    // STATISTICS
+    // =================================
+
     async loadStats() {
         try {
-            console.log('📊 Lade Statistiken...');
+            console.log('Lade Statistiken...');
 
             const response = await window.electronAPI.stats.get();
 
@@ -578,7 +621,7 @@ class FlashCardApp {
 
     async exportData() {
         try {
-            console.log('📤 Exportiere Daten...');
+            console.log('Exportiere Daten...');
 
             // Alle Daten sammeln
             const [cardsResponse, statsResponse] = await Promise.all([
@@ -611,7 +654,7 @@ class FlashCardApp {
 
             URL.revokeObjectURL(url);
 
-            this.showNotification('Daten erfolgreich exportiert! 📤', 'success');
+            this.showNotification('Daten erfolgreich exportiert!', 'success');
 
         } catch (error) {
             console.error('Fehler beim Exportieren:', error);
@@ -619,9 +662,12 @@ class FlashCardApp {
         }
     }
 
-    // Keyboard Shortcuts
+    // =================================
+    // KEYBOARD SHORTCUTS
+    // =================================
+
     handleKeyboard(event) {
-        // Ignore if typing in input fields
+        // Ignore wenn in Input-Feldern getippt wird
         if (event.target.tagName.toLowerCase() === 'textarea' ||
             event.target.tagName.toLowerCase() === 'input') {
             return;
@@ -658,7 +704,10 @@ class FlashCardApp {
         }
     }
 
-    // Notifications
+    // =================================
+    // NOTIFICATIONS
+    // =================================
+
     showNotification(message, type = 'info') {
         const notification = this.elements.notification;
         const text = this.elements.notificationText;
@@ -673,14 +722,17 @@ class FlashCardApp {
             this.hideNotification();
         }, 5000);
 
-        console.log(`📢 Notification (${type}):`, message);
+        console.log(`Notification (${type}):`, message);
     }
 
     hideNotification() {
         this.elements.notification.classList.remove('show');
     }
 
-    // Utility Functions
+    // =================================
+    // UTILITY FUNCTIONS
+    // =================================
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -693,27 +745,30 @@ class FlashCardApp {
 
     // Error Handler
     handleError(error, context = 'Allgemein') {
-        console.error(`❌ Fehler in ${context}:`, error);
+        console.error(`Fehler in ${context}:`, error);
         this.showNotification(`Fehler: ${error.message}`, 'error');
     }
 }
 
-// App initialisieren wenn DOM geladen ist
+// =================================
+// APP INITIALISIERUNG
+// =================================
+
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 DOM geladen, starte FlashCard App...');
+    console.log('DOM geladen, starte FlashCard App...');
 
     // Prüfe ob electronAPI verfügbar ist
     if (typeof window.electronAPI === 'undefined') {
-        console.error('❌ Electron API nicht verfügbar!');
+        console.error('Electron API nicht verfügbar!');
         document.body.innerHTML = `
-        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; color: white; text-align: center;">
-          <div>
-            <h1>⚠️ Fehler</h1>
-            <p>Die App läuft nicht in Electron.</p>
-            <p>Bitte starten Sie die App mit: <code>npm start</code></p>
-          </div>
-        </div>
-      `;
+            <div style="display: flex; justify-content: center; align-items: center; height: 100vh; color: white; text-align: center;">
+                <div>
+                    <h1>Fehler</h1>
+                    <p>Die App läuft nicht in Electron.</p>
+                    <p>Bitte starten Sie die App mit: <code>npm start</code></p>
+                </div>
+            </div>
+        `;
         return;
     }
 
@@ -721,16 +776,19 @@ document.addEventListener('DOMContentLoaded', () => {
     window.app = new FlashCardApp();
 });
 
-// Error Handler für unbehandelte Fehler
+// =================================
+// ERROR HANDLERS
+// =================================
+
 window.addEventListener('error', (event) => {
-    console.error('❌ Unbehandelter Fehler:', event.error);
+    console.error('Unbehandelter Fehler:', event.error);
     if (window.app) {
         window.app.showNotification('Ein unerwarteter Fehler ist aufgetreten', 'error');
     }
 });
 
 window.addEventListener('unhandledrejection', (event) => {
-    console.error('❌ Unbehandelte Promise Rejection:', event.reason);
+    console.error('Unbehandelte Promise Rejection:', event.reason);
     if (window.app) {
         window.app.showNotification('Ein Netzwerkfehler ist aufgetreten', 'error');
     }
