@@ -1,4 +1,4 @@
-// src/main/index.js - Korrigierte und sichere Version
+// src/main/index.js - Korrigierte Version mit allen Karten verfügbar
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
@@ -101,25 +101,14 @@ ipcMain.handle('cards:getAll', async () => {
     }
 });
 
+// GEÄNDERT: Alle Karten für Review verfügbar machen
 ipcMain.handle('cards:getForReview', async (event, limit = 20) => {
     try {
-        console.log(`📖 ${limit} Review-Karten angefordert`);
+        console.log(`📖 Alle Karten für Review angefordert (${cards.length} verfügbar)`);
 
-        const now = new Date();
-        const reviewCards = cards.filter(card => {
-            if (!card.lastReviewed) return true; // Neue Karten
-
-            const lastReview = new Date(card.lastReviewed);
-            const nextReview = new Date(lastReview.getTime() + (card.interval * 24 * 60 * 60 * 1000));
-
-            return nextReview <= now;
-        });
-
-        // Limit anwenden
-        const limitedCards = reviewCards.slice(0, limit);
-
-        console.log(`📋 ${limitedCards.length} Karten für Review bereit`);
-        return { success: true, data: limitedCards };
+        // ALLE Karten zurückgeben - keine Zeitbeschränkung
+        console.log(`📋 ${cards.length} Karten für Review bereit (ALLE)`);
+        return { success: true, data: cards };
     } catch (error) {
         console.error('❌ Fehler beim Abrufen der Review-Karten:', error);
         return { success: false, error: error.message };
